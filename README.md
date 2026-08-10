@@ -51,3 +51,7 @@ install.packages(c("dataRetrieval", "tidyverse", "ggplot2", "lubridate", "here",
 ### 3. Run the complete analysis script
 source("analysis.R")
 
+## Visual Output
+<img width="3000" height="3000" alt="va_streamflow_trends" src="https://github.com/user-attachments/assets/111ddf47-12a7-422d-8fd1-aa13123cf7fd" />
+
+
