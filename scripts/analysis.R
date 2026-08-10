@@ -1,106 +1,152 @@
-
-# PORTFOLIO PROJECT: VIRGINIA WATERSHED WATER SUPPLY ANALYSIS
+# ==============================================================================
+# PORTFOLIO PROJECT: VIRGINIA WATERSHED 7Q10 LOW-FLOW FREQUENCY ANALYSIS
 # Data Source: USGS National Water Information System (NWIS)
-# Target Parameters: Daily Streamflow (00060)
-# Timeline: 2025-01-01 to 2026-08-01
-
-# Load required packages (Install first via console if missing)
-#install.packages(c("dataRetrieval", "tidyverse", "ggplot2", "lubridate", "here", "dplyr", "scales"))
-
-library(dataRetrieval)
-library(ggplot2)
-library(lubridate)
-library(here)
-library(dplyr)
-library(scales)
+# Timeline: 1996-01-01 to 2026-08-01 (30-Year Required Climate Record)
+# ==============================================================================
 
 
-# DATA ACQUISITION (Automated & Local Caching)
+# ENVIRONMENT SETUP & DEPENDENCIES
 
-# Define cross-platform hidden directories
+# Master Package Installation Rule (Uncomment if setting up on a new machine)
+# install.packages(c("dataRetrieval", "lubridate", "here", "dplyr", "fasstr", "ggplot2"))
+
+library(dataRetrieval)  # Direct API client for USGS water data
+library(lubridate)      # Advanced date and time manipulation
+library(here)           # Cross-platform project path management
+library(dplyr)          # Data manipulation grammar
+library(fasstr)         # Hydrologic summary statistics tool
+
+
+# DATA ACQUISITION & LOCAL CACHING
+
+# Establish localized raw data directory
 if (!dir.exists(here("data", "raw"))) {
   dir.create(here("data", "raw"), recursive = TRUE)
 }
 
-local_data_path <- here("data", "raw", "va_watershed_streamflow.csv")
+local_data_path <- here("data", "raw", "va_watershed_30yr_streamflow.csv")
 
-# Fetch data via API if not cached locally
+# Query the USGS API if a local file cache is not found
 if (!file.exists(local_data_path)) {
-  message("Local data cache not found. Querying USGS API via dataRetrieval...")
+  message("Local cache not found. Querying USGS API for 30-year record...")
   
-  target_va_stations <- c("02037500", "02029000", "01631000", "01643700", "01663500", "0205450393")
+  # 5 primary Virginia streamgages with continuous 30-year records
+  target_va_stations <- c("02037500", "02029000", "01631000", "01643700", "01663500")
   
   va_watershed_data <- readNWISdv(
     siteNumbers = target_va_stations,
-    parameterCd = "00060", 
-    startDate = "2025-01-01",
+    parameterCd = "00060",   # Parameter code for Mean Daily Streamflow (cfs)
+    startDate = "1996-01-01",  # 30-year minimum climate baseline
     endDate = "2026-08-01"
   )
   
-  # Cache the file locally (Git will automatically ignore this file)
+  # Save to local directory (Git-ignored to protect repository size)
   write.csv(va_watershed_data, local_data_path, row.names = FALSE)
-  message("Success! Raw data saved to local directory.")
+  message("Success! Raw 30-year data saved to local directory.")
   
 } else {
-  message("Loading cached USGS water data from local directory...")
+  message("Loading cached 30-year USGS water data from local directory...")
   va_watershed_data <- read.csv(local_data_path)
 }
 
 
-# DATA TRANSFORMATION & CLEANING
+# DATA TRANSFORMATION & COLUMN REFACTORING
 
-
-# Format dates explicitly
-va_watershed_data$Date <- as.Date(va_watershed_data$Date)
-
-# Restructure columns and re-code raw station numbers to human-readable names
-structured_data <- va_watershed_data %>%
+# Clean and rename columns to match standard 'fasstr' specifications
+fasstr_ready_data <- va_watershed_data %>%
+  mutate(Date = as.Date(Date)) %>%  
   rename(
-    station_id = site_no,
-    date = Date,
-    streamflow_cfs = X_00060_00003,
-    status_code = X_00060_00003_cd
+    STATION_NUMBER = site_no,       
+    Value = X_00060_00003           
   ) %>%
   mutate(
-    station_id = as.character(station_id),
+    # FIXED: Convert to character AND pad with a leading zero if it is only 7 digits long
+    STATION_NUMBER = stringr::str_pad(as.character(STATION_NUMBER), width = 8, side = "left", pad = "0"),
+    
+    # Map USGS numeric IDs to human-readable river strings
     river_name = case_when(
-      station_id == "2037500" ~ "James River near Richmond",
-      station_id == "2029000" ~ "James River at Cartersville",
-      station_id == "1631000" ~ "Shenandoah River at Millville",
-      station_id == "1643700" ~ "Potomac River near Wash DC",
-      station_id == "1663500" ~ "Rappahannock River near Fredericksburg",
-      station_id == "205450393" ~ "Roanoke River at Roanoke",
-      TRUE ~ paste("Station", station_id)
+      STATION_NUMBER == "02037500" ~ "James River near Richmond",
+      STATION_NUMBER == "02029000" ~ "James River at Cartersville",
+      STATION_NUMBER == "01631000" ~ "Shenandoah River at Millville",
+      STATION_NUMBER == "01643700" ~ "Potomac River near Wash DC",
+      STATION_NUMBER == "01663500" ~ "Rappahannock River near Fredericksburg",
+      TRUE ~ paste("Station", STATION_NUMBER)
     )
   )
 
-# VISUALIZATION
 
+# 7Q10 STATISTICAL MODELING & AUTOMATED DISTRIBUTION PLOTTING
 
-# Generate time-series plot
-streamflow_plot <- ggplot(structured_data, aes(x = date, y = streamflow_cfs, color = river_name)) +
-  geom_line(alpha = 0.8, linewidth = 0.8) +
-  scale_y_log10(labels = scales::comma) + 
-  scale_color_brewer(palette = "Set2") +   
-  labs(
-    title = "Virginia Watershed Daily Streamflow Trends",
-    subtitle = "Data Source: USGS NWIS (2025 - 2026)",
-    x = "Timeline",
-    y = "Streamflow (Cubic Feet per Second - Log Scale)",
-    color = "River Monitoring Station"
-  ) +
-  theme_bw() +
-  theme(
-    panel.background = element_rect(fill = "#f0f0f0", colour = NA),
-    legend.position = "bottom",
-    legend.direction = "vertical", 
-    plot.title = element_text(face = "bold", size = 14),
-    panel.grid.minor = element_blank()
-  )
+message("Running Log-Pearson Type III distribution loops via fasstr...")
 
-# Show plot in RStudio
-print(streamflow_plot)
+# Initialize blank dataframe to compile multi-station calculations
+final_7q10_table <- data.frame(
+  River_Location = character(),
+  `7Q10_cfs` = numeric(),
+  stringsAsFactors = FALSE
+)
 
-# Export visualization to local output folder (Git will automatically ignore)
+# Establish localized public output directory
 if (!dir.exists(here("output"))) dir.create(here("output"))
-ggsave(here("output", "va_streamflow_trends.png"), plot = streamflow_plot, width = 10, height = 10)
+
+unique_rivers <- unique(fasstr_ready_data$river_name)
+
+# Sequentially calculate statistics and graphs for each river system
+for (river in unique_rivers) {
+  message(paste("Processing frequency analysis for:", river))
+  
+  # Filter to current river iteration and replace any 0 or negative values with 0.01.
+  # This prevents log-transformation failures (log of 0 is mathematically undefined) 
+  # while preserving extreme historical drought signatures.
+  river_subset <- fasstr_ready_data %>% 
+    filter(river_name == river) %>%
+    mutate(Value = ifelse(Value <= 0, 0.01, Value))
+  
+  # A. Isolate specific 7Q10 quantile metrics directly
+  q10_value <- fasstr::compute_frequency_quantile(
+    data = river_subset,
+    dates = Date,
+    values = Value,
+    roll_days = 7,          # The '7' in 7Q10: 7-day moving average window
+    return_period = 10,     # The '10' in 7Q10: 10-year recurrence interval (10% annual chance)
+    use_max = FALSE         # Directs calculation to evaluate minimum low-flow extremes
+  )
+  
+  # Merge row into master compilation dataframe
+  final_7q10_table <- rbind(
+    final_7q10_table, 
+    data.frame(River_Location = river, `7Q10_cfs` = q10_value)
+  )
+  
+  # B. Generate comprehensive annual frequency plots
+  freq_analysis <- fasstr::compute_annual_frequencies(
+    data = river_subset,
+    dates = Date,
+    values = Value,
+    roll_days = 7,          
+    use_max = FALSE,
+    fit_distr = "PIII"      # Fits data explicitly to Log-Pearson Type III
+  )
+  
+  # FIXED: Extract using the exact 'Freq_Plot' tag exported by fasstr
+  plot_obj <- freq_analysis$Freq_Plot
+  
+  if (!is.null(plot_obj)) {
+    # Generate clean, lowercase file naming convention for local Mac workspace
+    safe_name <- gsub(" ", "_", tolower(river))
+    file_target <- here("output", paste0("plot_7q10_fit_", safe_name, ".png"))
+    
+    # Save crisp distribution graph to git-tracked local output directory
+    ggplot2::ggsave(file_target, plot = plot_obj, width = 9, height = 6, dpi = 300)
+  }
+}
+
+# RESULTS EXPORT & CONSOLE SUMMARY
+
+# Print final calculation grid cleanly inside RStudio/VS Code console
+print("--- FINAL CALCULATED 7Q10 VALUES (CFS) ---")
+print(final_7q10_table)
+
+# Save final matrix cleanly to your output folder
+write.csv(final_7q10_table, here("output", "va_watershed_7Q10_results.csv"), row.names = FALSE)
+message("Analysis complete! Clean 7Q10 data and curve plots written to /output.")
