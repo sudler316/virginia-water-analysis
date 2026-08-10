@@ -1,4 +1,4 @@
-# Virginia Watershed Water Supply Analysis
+# Virginia Watershed Trends
 
 This repository contains a completed, automated R pipeline that programmatically ingests, transforms, and visualizes daily mean streamflow data across critical Virginia river basins. It demonstrates core data engineering and analytical workflows required for public water resource management, including automated API consumption, local caching strategies, and data visualization.
 
