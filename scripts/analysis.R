@@ -1,13 +1,12 @@
-install.packages(c("dataRetrieval", "tidyverse", "ggplot2", "lubridate", "here", "dplyr", "scales"))
 
-# ==============================================================================
 # PORTFOLIO PROJECT: VIRGINIA WATERSHED WATER SUPPLY ANALYSIS
 # Data Source: USGS National Water Information System (NWIS)
 # Target Parameters: Daily Streamflow (00060)
 # Timeline: 2025-01-01 to 2026-08-01
-# ==============================================================================
 
 # Load required packages (Install first via console if missing)
+#install.packages(c("dataRetrieval", "tidyverse", "ggplot2", "lubridate", "here", "dplyr", "scales"))
+
 library(dataRetrieval)
 library(ggplot2)
 library(lubridate)
@@ -15,9 +14,8 @@ library(here)
 library(dplyr)
 library(scales)
 
-# ------------------------------------------------------------------------------
+
 # DATA ACQUISITION (Automated & Local Caching)
-# ------------------------------------------------------------------------------
 
 # Define cross-platform hidden directories
 if (!dir.exists(here("data", "raw"))) {
@@ -48,9 +46,9 @@ if (!file.exists(local_data_path)) {
   va_watershed_data <- read.csv(local_data_path)
 }
 
-# ------------------------------------------------------------------------------
+
 # DATA TRANSFORMATION & CLEANING
-# ------------------------------------------------------------------------------
+
 
 # Format dates explicitly
 va_watershed_data$Date <- as.Date(va_watershed_data$Date)
@@ -66,19 +64,18 @@ structured_data <- va_watershed_data %>%
   mutate(
     station_id = as.character(station_id),
     river_name = case_when(
-      station_id == "02037500" ~ "James River near Richmond",
-      station_id == "02029000" ~ "James River at Cartersville",
-      station_id == "01631000" ~ "Shenandoah River at Millville",
-      station_id == "01643700" ~ "Potomac River near Wash DC",
-      station_id == "01663500" ~ "Rappahannock River near Fredericksburg",
-      station_id == "0205450393" ~ "Roanoke River at Roanoke",
+      station_id == "2037500" ~ "James River near Richmond",
+      station_id == "2029000" ~ "James River at Cartersville",
+      station_id == "1631000" ~ "Shenandoah River at Millville",
+      station_id == "1643700" ~ "Potomac River near Wash DC",
+      station_id == "1663500" ~ "Rappahannock River near Fredericksburg",
+      station_id == "205450393" ~ "Roanoke River at Roanoke",
       TRUE ~ paste("Station", station_id)
     )
   )
 
-# ------------------------------------------------------------------------------
 # VISUALIZATION
-# ------------------------------------------------------------------------------
+
 
 # Generate time-series plot
 streamflow_plot <- ggplot(structured_data, aes(x = date, y = streamflow_cfs, color = river_name)) +
@@ -92,8 +89,9 @@ streamflow_plot <- ggplot(structured_data, aes(x = date, y = streamflow_cfs, col
     y = "Streamflow (Cubic Feet per Second - Log Scale)",
     color = "River Monitoring Station"
   ) +
-  theme_minimal() +
+  theme_bw() +
   theme(
+    panel.background = element_rect(fill = "#f0f0f0", colour = NA),
     legend.position = "bottom",
     legend.direction = "vertical", 
     plot.title = element_text(face = "bold", size = 14),
@@ -105,4 +103,4 @@ print(streamflow_plot)
 
 # Export visualization to local output folder (Git will automatically ignore)
 if (!dir.exists(here("output"))) dir.create(here("output"))
-ggsave(here("output", "va_streamflow_trends.png"), plot = streamflow_plot, width = 10, height = 6)
+ggsave(here("output", "va_streamflow_trends.png"), plot = streamflow_plot, width = 10, height = 10)
