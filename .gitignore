@@ -1,2 +1,14 @@
+# History and workspace files
+.Rhistory
+.RData
+.Ruserdata
+
+# Project configuration files
+*.Rproj.user/
+
+# In-development or local project files
+virginia-water-analysis.Rproj
+
+# Raw data files
+raw_virginia_streamflow.csv
 data/
-.Rproj.user
